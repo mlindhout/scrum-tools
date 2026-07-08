@@ -5,10 +5,14 @@ import {
   canModifyCard,
   cardsInColumn,
   defaultRetroDate,
+  hasVoted,
   isColumnId,
   sortRetrospectivesNewestFirst,
+  toggleCardVote,
   validateCardText,
+  voteCount,
   type Card,
+  type CardVote,
   type Retrospective,
 } from "./retro";
 
@@ -100,6 +104,70 @@ describe("sortRetrospectivesNewestFirst", () => {
     ];
     sortRetrospectivesNewestFirst(list);
     expect(list.map((r) => r.id)).toEqual(["a", "b"]);
+  });
+});
+
+const vote = (cardId: string, clientId: string): CardVote => ({
+  cardId,
+  clientId,
+});
+
+describe("toggleCardVote", () => {
+  it("adds a +1 when the Member has not voted on the Card", () => {
+    const next = toggleCardVote([], "c1", "me");
+    expect(next).toEqual([{ cardId: "c1", clientId: "me" }]);
+  });
+
+  it("removes the +1 when the Member has already voted (toggle off)", () => {
+    const next = toggleCardVote([vote("c1", "me")], "c1", "me");
+    expect(next).toEqual([]);
+  });
+
+  it("is one-per-clientId: toggling on twice never duplicates", () => {
+    const once = toggleCardVote([], "c1", "me");
+    const off = toggleCardVote(once, "c1", "me");
+    const on = toggleCardVote(off, "c1", "me");
+    expect(on).toEqual([{ cardId: "c1", clientId: "me" }]);
+  });
+
+  it("only affects the given Member's vote on the given Card", () => {
+    const votes = [
+      vote("c1", "me"),
+      vote("c1", "you"),
+      vote("c2", "me"),
+    ];
+    const next = toggleCardVote(votes, "c1", "me");
+    expect(next).toEqual([vote("c1", "you"), vote("c2", "me")]);
+  });
+
+  it("allows a Member to +1 their own Card (author not special-cased)", () => {
+    const next = toggleCardVote([], "mine", "author");
+    expect(next).toEqual([{ cardId: "mine", clientId: "author" }]);
+  });
+
+  it("does not mutate the input array", () => {
+    const votes = [vote("c1", "me")];
+    toggleCardVote(votes, "c1", "me");
+    toggleCardVote(votes, "c2", "me");
+    expect(votes).toEqual([vote("c1", "me")]);
+  });
+});
+
+describe("voteCount", () => {
+  it("counts the +1's on a Card", () => {
+    const votes = [vote("c1", "a"), vote("c1", "b"), vote("c2", "a")];
+    expect(voteCount(votes, "c1")).toBe(2);
+    expect(voteCount(votes, "c2")).toBe(1);
+    expect(voteCount(votes, "c3")).toBe(0);
+  });
+});
+
+describe("hasVoted", () => {
+  it("reports whether a Member has +1'd a Card", () => {
+    const votes = [vote("c1", "me")];
+    expect(hasVoted(votes, "c1", "me")).toBe(true);
+    expect(hasVoted(votes, "c1", "you")).toBe(false);
+    expect(hasVoted(votes, "c2", "me")).toBe(false);
   });
 });
 

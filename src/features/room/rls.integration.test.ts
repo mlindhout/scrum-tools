@@ -56,14 +56,21 @@ describe.skipIf(!enabled)("room RLS capability", () => {
       .insert({ id: retroId, room_id: roomId, date: "2026-07-08" });
     expect(retroInsert.error).toBeNull();
 
+    const cardId = nanoid();
     const cardInsert = await client.from("card").insert({
-      id: nanoid(),
+      id: cardId,
       retrospective_id: retroId,
       column_id: "praise",
       text: "Great sprint",
       author_client_id: nanoid(),
     });
     expect(cardInsert.error).toBeNull();
+
+    const voterClientId = nanoid();
+    const voteInsert = await client
+      .from("card_vote")
+      .insert({ card_id: cardId, client_id: voterClientId });
+    expect(voteInsert.error).toBeNull();
 
     // Known Room id → capability RPCs return the rows.
     const retros = await client.rpc("list_retrospectives", {
@@ -78,6 +85,22 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     expect(cards.data).toHaveLength(1);
     expect(cards.data?.[0]).toMatchObject({ column_id: "praise" });
 
+    const cardVotes = await client.rpc("list_card_votes", {
+      p_room_id: roomId,
+    });
+    expect(cardVotes.error).toBeNull();
+    expect(cardVotes.data).toHaveLength(1);
+    expect(cardVotes.data?.[0]).toMatchObject({
+      card_id: cardId,
+      client_id: voterClientId,
+    });
+
+    // One +1 per Member per Card — a duplicate insert is rejected by the PK.
+    const dupVote = await client
+      .from("card_vote")
+      .insert({ card_id: cardId, client_id: voterClientId });
+    expect(dupVote.error).not.toBeNull();
+
     // Unknown Room id → nothing.
     const otherRetros = await client.rpc("list_retrospectives", {
       p_room_id: nanoid(),
@@ -89,5 +112,7 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     expect(allRetros.error === null ? allRetros.data : []).toEqual([]);
     const allCards = await client.from("card").select("*");
     expect(allCards.error === null ? allCards.data : []).toEqual([]);
+    const allVotes = await client.from("card_vote").select("*");
+    expect(allVotes.error === null ? allVotes.data : []).toEqual([]);
   });
 });

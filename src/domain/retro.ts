@@ -45,6 +45,45 @@ export interface Card {
   createdAt: string;
 }
 
+/** A single anonymous +1 on a Card, unique per Member (`clientId`). */
+export interface CardVote {
+  cardId: string;
+  clientId: string;
+}
+
+/** Whether the given Member has already +1'd the Card. */
+export function hasVoted(
+  votes: CardVote[],
+  cardId: string,
+  clientId: string,
+): boolean {
+  return votes.some((v) => v.cardId === cardId && v.clientId === clientId);
+}
+
+/** The total number of +1's on a Card. */
+export function voteCount(votes: CardVote[], cardId: string): number {
+  return votes.filter((v) => v.cardId === cardId).length;
+}
+
+/**
+ * Toggle a Member's +1 on a Card, returning the next votes list. Idempotent and
+ * one-per-`clientId`: adds the vote if absent, removes it if present, never
+ * duplicating. The author of a Card is not special-cased — a Member may +1 their
+ * own Card. Does not mutate the input.
+ */
+export function toggleCardVote(
+  votes: CardVote[],
+  cardId: string,
+  clientId: string,
+): CardVote[] {
+  if (hasVoted(votes, cardId, clientId)) {
+    return votes.filter(
+      (v) => !(v.cardId === cardId && v.clientId === clientId),
+    );
+  }
+  return [...votes, { cardId, clientId }];
+}
+
 const MAX_CARD_LENGTH = 2000;
 
 /** Today's local date as a `YYYY-MM-DD` label — the default for a new Retro. */

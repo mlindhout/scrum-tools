@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import {
   isColumnId,
   type Card,
+  type CardVote,
   type ColumnId,
   type Retrospective,
 } from "../../domain/retro";
@@ -31,6 +32,12 @@ interface CardRow {
   column_id: string;
   text: string;
   author_client_id: string;
+  created_at: string;
+}
+
+interface CardVoteRow {
+  card_id: string;
+  client_id: string;
   created_at: string;
 }
 
@@ -130,5 +137,44 @@ export async function updateCardText(id: string, text: string): Promise<void> {
 /** Delete a Card (author-only; enforced by the caller). */
 export async function deleteCard(id: string): Promise<void> {
   const { error } = await supabase.from("card").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** All +1 votes across a Room's Cards (anonymous; only counts shown in the UI). */
+export async function listCardVotes(roomId: string): Promise<CardVote[]> {
+  const { data, error } = await supabase.rpc("list_card_votes", {
+    p_room_id: roomId,
+  });
+  if (error) throw error;
+  return ((data as CardVoteRow[]) ?? []).map((row) => ({
+    cardId: row.card_id,
+    clientId: row.client_id,
+  }));
+}
+
+/** Add a Member's +1 to a Card; the composite PK makes it one-per-`clientId`. */
+export async function addCardVote(
+  cardId: string,
+  clientId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("card_vote")
+    .upsert(
+      { card_id: cardId, client_id: clientId },
+      { onConflict: "card_id,client_id", ignoreDuplicates: true },
+    );
+  if (error) throw error;
+}
+
+/** Remove a Member's +1 from a Card (idempotent). */
+export async function removeCardVote(
+  cardId: string,
+  clientId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("card_vote")
+    .delete()
+    .eq("card_id", cardId)
+    .eq("client_id", clientId);
   if (error) throw error;
 }
