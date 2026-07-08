@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { resolveDisplayName, type PresentMember } from "../../domain/identity";
 import { PokerTable } from "../poker/PokerTable";
 import { usePokerRound } from "../poker/usePokerRound";
+import { RetroBoard } from "../retro/RetroBoard";
 
 interface RoomShellProps {
   room: { id: string; name: string };
@@ -127,9 +128,7 @@ export function RoomShell({
           {tab === "poker" ? (
             <PokerTable round={round} />
           ) : (
-            <Placeholder title="Retrospective">
-              Boards and actions arrive in a later slice.
-            </Placeholder>
+            <RetroBoard roomId={room.id} clientId={clientId} />
           )}
         </section>
 
@@ -164,20 +163,5 @@ function TabButton({
     >
       {children}
     </button>
-  );
-}
-
-function Placeholder({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center">
-      <h2 className="text-lg font-semibold text-slate-700">{title}</h2>
-      <p className="mt-1 text-slate-500">{children}</p>
-    </div>
   );
 }

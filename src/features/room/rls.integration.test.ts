@@ -45,4 +45,49 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     // Either RLS returns an empty set (no select policy) — never the full table.
     expect(error === null ? data : []).toEqual([]);
   });
+
+  it("reads retro data only via the Room capability, never by enumeration", async () => {
+    const roomId = nanoid();
+    await client.from("room").insert({ id: roomId, name: "Retro room" });
+
+    const retroId = nanoid();
+    const retroInsert = await client
+      .from("retrospective")
+      .insert({ id: retroId, room_id: roomId, date: "2026-07-08" });
+    expect(retroInsert.error).toBeNull();
+
+    const cardInsert = await client.from("card").insert({
+      id: nanoid(),
+      retrospective_id: retroId,
+      column_id: "praise",
+      text: "Great sprint",
+      author_client_id: nanoid(),
+    });
+    expect(cardInsert.error).toBeNull();
+
+    // Known Room id → capability RPCs return the rows.
+    const retros = await client.rpc("list_retrospectives", {
+      p_room_id: roomId,
+    });
+    expect(retros.error).toBeNull();
+    expect(retros.data).toHaveLength(1);
+    expect(retros.data?.[0]).toMatchObject({ id: retroId, room_id: roomId });
+
+    const cards = await client.rpc("list_cards", { p_room_id: roomId });
+    expect(cards.error).toBeNull();
+    expect(cards.data).toHaveLength(1);
+    expect(cards.data?.[0]).toMatchObject({ column_id: "praise" });
+
+    // Unknown Room id → nothing.
+    const otherRetros = await client.rpc("list_retrospectives", {
+      p_room_id: nanoid(),
+    });
+    expect(otherRetros.data ?? []).toEqual([]);
+
+    // Blanket selects are blocked (no SELECT policy) — no enumeration.
+    const allRetros = await client.from("retrospective").select("*");
+    expect(allRetros.error === null ? allRetros.data : []).toEqual([]);
+    const allCards = await client.from("card").select("*");
+    expect(allCards.error === null ? allCards.data : []).toEqual([]);
+  });
 });
