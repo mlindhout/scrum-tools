@@ -1,10 +1,9 @@
 import { useState } from "react";
 import {
-  isNameTaken,
+  resolveDisplayName,
   suggestName,
   type PresentMember,
 } from "../../domain/identity";
-import { validateDisplayName } from "../../domain/room";
 
 interface JoinGateProps {
   roomName: string;
@@ -28,18 +27,18 @@ export function JoinGate({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const result = validateDisplayName(name);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    const outcome = resolveDisplayName(name, roster, clientId);
+    switch (outcome.status) {
+      case "invalid":
+        setError(outcome.error);
+        return;
+      case "taken":
+        setName(outcome.suggestion);
+        setError(`That name is taken here. Try “${outcome.suggestion}”.`);
+        return;
+      case "ok":
+        onJoin(outcome.name);
     }
-    if (isNameTaken(result.name, roster, clientId)) {
-      const suggestion = suggestName(result.name, roster, clientId);
-      setName(suggestion);
-      setError(`That name is taken here. Try “${suggestion}”.`);
-      return;
-    }
-    onJoin(result.name);
   }
 
   return (

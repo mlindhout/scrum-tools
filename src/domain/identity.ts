@@ -6,6 +6,8 @@
  * the same `clientId` reclaims the seat and is never treated as a collision.
  */
 
+import { validateDisplayName } from "./room";
+
 export interface PresentMember {
   clientId: string;
   name: string;
@@ -59,4 +61,30 @@ export function suggestName(
     candidate = `${base} (${n})`;
   }
   return candidate;
+}
+
+export type NameOutcome =
+  | { status: "ok"; name: string }
+  | { status: "invalid"; error: string }
+  | { status: "taken"; suggestion: string };
+
+/**
+ * Resolve a desired display name against the present roster: reject empty names,
+ * flag a collision with the nearest free suggestion, or accept the trimmed name.
+ * Callers own the messaging for `invalid`/`taken`; only the outcome is shared.
+ */
+export function resolveDisplayName(
+  desired: string,
+  present: PresentMember[],
+  selfClientId: string,
+): NameOutcome {
+  const result = validateDisplayName(desired);
+  if (!result.ok) return { status: "invalid", error: result.error };
+  if (isNameTaken(result.name, present, selfClientId)) {
+    return {
+      status: "taken",
+      suggestion: suggestName(result.name, present, selfClientId),
+    };
+  }
+  return { status: "ok", name: result.name };
 }

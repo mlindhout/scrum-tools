@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  isNameTaken,
-  suggestName,
-  type PresentMember,
-} from "../../domain/identity";
-import { validateDisplayName } from "../../domain/room";
+import { resolveDisplayName, type PresentMember } from "../../domain/identity";
 
 interface RoomShellProps {
   room: { id: string; name: string };
@@ -33,20 +28,20 @@ export function RoomShell({
 
   function saveName(e: React.FormEvent) {
     e.preventDefault();
-    const result = validateDisplayName(draft);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    const outcome = resolveDisplayName(draft, roster, clientId);
+    switch (outcome.status) {
+      case "invalid":
+        setError(outcome.error);
+        return;
+      case "taken":
+        setDraft(outcome.suggestion);
+        setError(`Taken. Try “${outcome.suggestion}”.`);
+        return;
+      case "ok":
+        onRename(outcome.name);
+        setEditing(false);
+        setError(null);
     }
-    if (isNameTaken(result.name, roster, clientId)) {
-      const suggestion = suggestName(result.name, roster, clientId);
-      setDraft(suggestion);
-      setError(`Taken. Try “${suggestion}”.`);
-      return;
-    }
-    onRename(result.name);
-    setEditing(false);
-    setError(null);
   }
 
   async function share() {
