@@ -4,17 +4,23 @@ import {
   cardsInColumn,
   canModifyCard,
   defaultRetroDate,
+  hasVoted,
   sortRetrospectivesNewestFirst,
   validateCardText,
+  voteCount,
   type Card,
+  type CardVote,
   type Retrospective,
 } from "../../domain/retro";
 import {
+  addCardVote,
   createCard,
   createRetrospective,
   deleteCard,
+  listCardVotes,
   listCards,
   listRetrospectives,
+  removeCardVote,
   updateCardText,
   updateRetrospectiveDate,
 } from "./retroApi";
@@ -34,16 +40,19 @@ interface RetroBoardProps {
 export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
   const [retros, setRetros] = useState<Retrospective[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
+  const [votes, setVotes] = useState<CardVote[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [nextRetros, nextCards] = await Promise.all([
+    const [nextRetros, nextCards, nextVotes] = await Promise.all([
       listRetrospectives(roomId),
       listCards(roomId),
+      listCardVotes(roomId),
     ]);
     setRetros(sortRetrospectivesNewestFirst(nextRetros));
     setCards(nextCards);
+    setVotes(nextVotes);
     setLoading(false);
   }, [roomId]);
 
@@ -156,6 +165,7 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
             title={column.title}
             cards={cardsInColumn(selectedCards, column.id)}
             clientId={clientId}
+            votes={votes}
             onAdd={(text) =>
               mutate(() =>
                 createCard(selected.id, column.id, text, clientId),
@@ -163,6 +173,13 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
             }
             onEdit={(id, text) => mutate(() => updateCardText(id, text))}
             onDelete={(id) => mutate(() => deleteCard(id))}
+            onToggleVote={(id) =>
+              mutate(() =>
+                hasVoted(votes, id, clientId)
+                  ? removeCardVote(id, clientId)
+                  : addCardVote(id, clientId),
+              )
+            }
           />
         ))}
       </div>
@@ -174,16 +191,20 @@ function ColumnPanel({
   title,
   cards,
   clientId,
+  votes,
   onAdd,
   onEdit,
   onDelete,
+  onToggleVote,
 }: {
   title: string;
   cards: Card[];
   clientId: string;
+  votes: CardVote[];
   onAdd: (text: string) => Promise<void>;
   onEdit: (id: string, text: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onToggleVote: (id: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -210,8 +231,11 @@ function ColumnPanel({
             key={card.id}
             card={card}
             mine={canModifyCard(card, clientId)}
+            voteCount={voteCount(votes, card.id)}
+            voted={hasVoted(votes, card.id, clientId)}
             onEdit={onEdit}
             onDelete={onDelete}
+            onToggleVote={onToggleVote}
           />
         ))}
       </ul>
@@ -242,13 +266,19 @@ function ColumnPanel({
 function CardItem({
   card,
   mine,
+  voteCount,
+  voted,
   onEdit,
   onDelete,
+  onToggleVote,
 }: {
   card: Card;
   mine: boolean;
+  voteCount: number;
+  voted: boolean;
   onEdit: (id: string, text: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onToggleVote: (id: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card.text);
@@ -305,25 +335,39 @@ function CardItem({
   return (
     <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
       <p className="whitespace-pre-wrap break-words">{card.text}</p>
-      {mine && (
-        <div className="mt-1 flex gap-2 text-xs">
-          <button
-            onClick={() => {
-              setDraft(card.text);
-              setEditing(true);
-            }}
-            className="text-slate-500 underline"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => void onDelete(card.id)}
-            className="text-red-600 underline"
-          >
-            Delete
-          </button>
-        </div>
-      )}
+      <div className="mt-1 flex items-center gap-2 text-xs">
+        <button
+          onClick={() => void onToggleVote(card.id)}
+          aria-pressed={voted}
+          aria-label={voted ? "Remove your +1" : "Add a +1"}
+          className={`rounded-full border px-2 py-0.5 font-medium ${
+            voted
+              ? "border-slate-900 bg-slate-900 text-white"
+              : "border-slate-300 text-slate-600"
+          }`}
+        >
+          +1 {voteCount}
+        </button>
+        {mine && (
+          <>
+            <button
+              onClick={() => {
+                setDraft(card.text);
+                setEditing(true);
+              }}
+              className="text-slate-500 underline"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => void onDelete(card.id)}
+              className="text-red-600 underline"
+            >
+              Delete
+            </button>
+          </>
+        )}
+      </div>
     </li>
   );
 }
