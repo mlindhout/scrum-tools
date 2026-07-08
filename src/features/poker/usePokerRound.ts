@@ -69,8 +69,8 @@ export function usePokerRound(
   const [tick, setTick] = useState(0);
 
   // Keep the latest values reachable from channel callbacks without resubscribe.
-  const state = useRef({ startedAt, myVote, revealed });
-  state.current = { startedAt, myVote, revealed };
+  const state = useRef({ startedAt, myVote });
+  state.current = { startedAt, myVote };
 
   const track = useCallback((meta: Partial<PresenceMeta>) => {
     const channel = channelRef.current;
@@ -165,7 +165,9 @@ export function usePokerRound(
   const presentIds = roster.map((m) => m.clientId);
   const everyoneVoted =
     presentIds.length > 0 &&
-    presentIds.every((id) => votedIds[id] || (id === self.clientId && myVote));
+    presentIds.every(
+      (id) => votedIds[id] || (id === self.clientId && myVote !== null),
+    );
 
   useEffect(() => {
     if (startedAt === null || revealed) return;
