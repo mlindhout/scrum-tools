@@ -63,11 +63,7 @@ export function useRoomPresence(
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED" && self) {
-          void channel.track({
-        clientId: self.clientId,
-        name: self.name,
-        mode: self.mode,
-      });
+          void channel.track(self);
         }
       });
 
@@ -83,11 +79,7 @@ export function useRoomPresence(
   useEffect(() => {
     const channel = channelRef.current;
     if (channel && self) {
-      void channel.track({
-        clientId: self.clientId,
-        name: self.name,
-        mode: self.mode,
-      });
+      void channel.track(self);
     }
   }, [self?.clientId, self?.name, self?.mode]);
 
