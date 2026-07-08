@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   COLUMNS,
   COLUMN_IDS,
+  actionsInRetrospective,
   canModifyCard,
   cardsInColumn,
   defaultRetroDate,
   hasVoted,
   isColumnId,
+  normalizeAssignee,
   sortRetrospectivesNewestFirst,
   toggleCardVote,
+  validateActionDescription,
   validateCardText,
   voteCount,
+  type Action,
   type Card,
   type CardVote,
   type Retrospective,
@@ -192,5 +196,61 @@ describe("cardsInColumn", () => {
       "p2",
     ]);
     expect(cardsInColumn(cards, "start")).toEqual([]);
+  });
+});
+
+describe("validateActionDescription", () => {
+  it("accepts and trims non-empty text", () => {
+    expect(validateActionDescription("  call the client  ")).toEqual({
+      ok: true,
+      name: "call the client",
+    });
+  });
+
+  it("rejects empty or whitespace-only text", () => {
+    expect(validateActionDescription("   ").ok).toBe(false);
+    expect(validateActionDescription("").ok).toBe(false);
+  });
+
+  it("rejects text beyond the max length", () => {
+    expect(validateActionDescription("x".repeat(2001)).ok).toBe(false);
+    expect(validateActionDescription("x".repeat(2000)).ok).toBe(true);
+  });
+});
+
+describe("normalizeAssignee", () => {
+  it("trims and keeps a non-empty assignee", () => {
+    expect(normalizeAssignee("  Marc  ")).toBe("Marc");
+  });
+
+  it("treats empty or whitespace-only as no assignee (null)", () => {
+    expect(normalizeAssignee("")).toBeNull();
+    expect(normalizeAssignee("   ")).toBeNull();
+    expect(normalizeAssignee(null)).toBeNull();
+    expect(normalizeAssignee(undefined)).toBeNull();
+  });
+});
+
+const action = (id: string, createdAt: string, done = false): Action => ({
+  id,
+  retrospectiveId: "retro",
+  description: id,
+  assignee: null,
+  done,
+  createdAt,
+});
+
+describe("actionsInRetrospective", () => {
+  it("keeps only actions for the retrospective, oldest first", () => {
+    const actions = [
+      { ...action("a2", "2026-07-08T11:00:00Z"), retrospectiveId: "retro" },
+      { ...action("other", "2026-07-08T10:00:00Z"), retrospectiveId: "x" },
+      { ...action("a1", "2026-07-08T09:00:00Z"), retrospectiveId: "retro" },
+    ];
+    expect(actionsInRetrospective(actions, "retro").map((a) => a.id)).toEqual([
+      "a1",
+      "a2",
+    ]);
+    expect(actionsInRetrospective(actions, "none")).toEqual([]);
   });
 });

@@ -84,7 +84,23 @@ export function toggleCardVote(
   return [...votes, { cardId, clientId }];
 }
 
+/**
+ * A follow-up Action created from a Card but standing alone afterwards: a
+ * required description, an optional free-text assignee and a done-toggle. It
+ * keeps NO reference to the originating Card (PRD). Any present Member may edit,
+ * toggle or delete any Action — there is no authorship check.
+ */
+export interface Action {
+  id: string;
+  retrospectiveId: string;
+  description: string;
+  assignee: string | null;
+  done: boolean;
+  createdAt: string;
+}
+
 const MAX_CARD_LENGTH = 2000;
+const MAX_ACTION_LENGTH = 2000;
 
 /** Today's local date as a `YYYY-MM-DD` label — the default for a new Retro. */
 export function defaultRetroDate(now: Date): string {
@@ -101,6 +117,27 @@ export function validateCardText(raw: string): ValidationResult {
   if (name.length > MAX_CARD_LENGTH)
     return { ok: false, error: "Card text is too long" };
   return { ok: true, name };
+}
+
+/** An Action description is required (trimmed) and within the length limit. */
+export function validateActionDescription(raw: string): ValidationResult {
+  const name = raw.trim();
+  if (name.length === 0)
+    return { ok: false, error: "Action description is required" };
+  if (name.length > MAX_ACTION_LENGTH)
+    return { ok: false, error: "Action description is too long" };
+  return { ok: true, name };
+}
+
+/**
+ * Normalise a free-text assignee: trim it, and treat empty/whitespace-only (or
+ * a missing value) as no assignee (`null`). The assignee is optional (PRD).
+ */
+export function normalizeAssignee(
+  raw: string | null | undefined,
+): string | null {
+  const trimmed = (raw ?? "").trim();
+  return trimmed.length === 0 ? null : trimmed;
 }
 
 /** Only the author (by `clientId`) may edit or delete their own Card. */
@@ -122,5 +159,15 @@ export function sortRetrospectivesNewestFirst(
 export function cardsInColumn(cards: Card[], column: ColumnId): Card[] {
   return cards
     .filter((c) => c.column === column)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** The Actions of a Retrospective, oldest first (creation order). */
+export function actionsInRetrospective(
+  actions: Action[],
+  retrospectiveId: string,
+): Action[] {
+  return actions
+    .filter((a) => a.retrospectiveId === retrospectiveId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

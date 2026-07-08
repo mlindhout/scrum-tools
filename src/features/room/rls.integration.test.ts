@@ -72,6 +72,15 @@ describe.skipIf(!enabled)("room RLS capability", () => {
       .insert({ card_id: cardId, client_id: voterClientId });
     expect(voteInsert.error).toBeNull();
 
+    const actionId = nanoid();
+    const actionInsert = await client.from("action").insert({
+      id: actionId,
+      retrospective_id: retroId,
+      description: "Follow up with the client",
+      assignee: "Marc",
+    });
+    expect(actionInsert.error).toBeNull();
+
     // Known Room id → capability RPCs return the rows.
     const retros = await client.rpc("list_retrospectives", {
       p_room_id: roomId,
@@ -95,6 +104,16 @@ describe.skipIf(!enabled)("room RLS capability", () => {
       client_id: voterClientId,
     });
 
+    const actionRows = await client.rpc("list_actions", { p_room_id: roomId });
+    expect(actionRows.error).toBeNull();
+    expect(actionRows.data).toHaveLength(1);
+    expect(actionRows.data?.[0]).toMatchObject({
+      id: actionId,
+      description: "Follow up with the client",
+      assignee: "Marc",
+      done: false,
+    });
+
     // One +1 per Member per Card — a duplicate insert is rejected by the PK.
     const dupVote = await client
       .from("card_vote")
@@ -114,6 +133,8 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     expect(allCards.error === null ? allCards.data : []).toEqual([]);
     const allVotes = await client.from("card_vote").select("*");
     expect(allVotes.error === null ? allVotes.data : []).toEqual([]);
+    const allActions = await client.from("action").select("*");
+    expect(allActions.error === null ? allActions.data : []).toEqual([]);
   });
 
   it("renames a Room via the capability and bumps its activity clock", async () => {
@@ -152,6 +173,11 @@ describe.skipIf(!enabled)("room RLS capability", () => {
       text: "Old note",
       author_client_id: nanoid(),
     });
+    await client.from("action").insert({
+      id: nanoid(),
+      retrospective_id: retroId,
+      description: "Old follow-up",
+    });
 
     const cleanup = await client.rpc("cleanup_stale_rooms");
     expect(cleanup.error).toBeNull();
@@ -165,6 +191,10 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     expect(staleRetros.data ?? []).toEqual([]);
     const staleCards = await client.rpc("list_cards", { p_room_id: staleId });
     expect(staleCards.data ?? []).toEqual([]);
+    const staleActions = await client.rpc("list_actions", {
+      p_room_id: staleId,
+    });
+    expect(staleActions.data ?? []).toEqual([]);
 
     // Fresh Room retained.
     const fresh = await client.rpc("get_room", { p_id: freshId });
