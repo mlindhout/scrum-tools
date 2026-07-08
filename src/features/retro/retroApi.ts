@@ -1,6 +1,11 @@
 import { nanoid } from "nanoid";
 import { supabase } from "../../lib/supabase";
-import { isColumnId, type Card, type ColumnId, type Retrospective } from "../../domain/retro";
+import {
+  isColumnId,
+  type Card,
+  type ColumnId,
+  type Retrospective,
+} from "../../domain/retro";
 
 /**
  * Persistent retrospective access. Reads go through the `list_retrospectives` /

@@ -24,9 +24,7 @@ export const COLUMNS: readonly Column[] = [
 export const COLUMN_IDS: readonly ColumnId[] = COLUMNS.map((c) => c.id);
 
 export function isColumnId(value: unknown): value is ColumnId {
-  return (
-    typeof value === "string" && COLUMN_IDS.includes(value as ColumnId)
-  );
+  return typeof value === "string" && COLUMN_IDS.includes(value as ColumnId);
 }
 
 export interface Retrospective {
