@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveDisplayName, type PresentMember } from "../../domain/identity";
+import { PokerTable } from "../poker/PokerTable";
+import { usePokerRound } from "../poker/usePokerRound";
 
 interface RoomShellProps {
   room: { id: string; name: string };
@@ -21,6 +23,8 @@ export function RoomShell({
 }: RoomShellProps) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("poker");
+  // Kept mounted across tabs so every present Member stays on the poker table.
+  const round = usePokerRound(room.id, { clientId, name }, roster);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
@@ -121,9 +125,7 @@ export function RoomShell({
 
         <section className="py-8" role="tabpanel">
           {tab === "poker" ? (
-            <Placeholder title="Planning poker">
-              Estimation rounds arrive in a later slice.
-            </Placeholder>
+            <PokerTable round={round} />
           ) : (
             <Placeholder title="Retrospective">
               Boards and actions arrive in a later slice.
