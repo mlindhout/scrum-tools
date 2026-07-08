@@ -46,7 +46,8 @@ interface RetroBoardProps {
  * The persistent, live retrospective board. Thin shell over the pure domain
  * helpers and the capability RPCs: it loads the Room's retros/cards, keeps them
  * in sync via Broadcast, and lets any Member create retros/cards while only the
- * author can edit or delete their own Card.
+ * author can edit or delete their own Card. Any Member may lock a Retrospective,
+ * which freezes the whole board read-only until it is unlocked.
  */
 export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
   const [retros, setRetros] = useState<Retrospective[]>([]);
