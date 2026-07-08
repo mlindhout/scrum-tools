@@ -231,21 +231,25 @@ describe("normalizeAssignee", () => {
   });
 });
 
-const action = (id: string, createdAt: string, done = false): Action => ({
+const action = (
+  id: string,
+  createdAt: string,
+  retrospectiveId = "retro",
+): Action => ({
   id,
-  retrospectiveId: "retro",
+  retrospectiveId,
   description: id,
   assignee: null,
-  done,
+  done: false,
   createdAt,
 });
 
 describe("actionsInRetrospective", () => {
   it("keeps only actions for the retrospective, oldest first", () => {
     const actions = [
-      { ...action("a2", "2026-07-08T11:00:00Z"), retrospectiveId: "retro" },
-      { ...action("other", "2026-07-08T10:00:00Z"), retrospectiveId: "x" },
-      { ...action("a1", "2026-07-08T09:00:00Z"), retrospectiveId: "retro" },
+      action("a2", "2026-07-08T11:00:00Z"),
+      action("other", "2026-07-08T10:00:00Z", "x"),
+      action("a1", "2026-07-08T09:00:00Z"),
     ];
     expect(actionsInRetrospective(actions, "retro").map((a) => a.id)).toEqual([
       "a1",
