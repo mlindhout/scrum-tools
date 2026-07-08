@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveDisplayName, type PresentMember } from "../../domain/identity";
+import { RetroBoard } from "../retro/RetroBoard";
 
 interface RoomShellProps {
   room: { id: string; name: string };
@@ -125,9 +126,7 @@ export function RoomShell({
               Estimation rounds arrive in a later slice.
             </Placeholder>
           ) : (
-            <Placeholder title="Retrospective">
-              Boards and actions arrive in a later slice.
-            </Placeholder>
+            <RetroBoard roomId={room.id} clientId={clientId} />
           )}
         </section>
 
