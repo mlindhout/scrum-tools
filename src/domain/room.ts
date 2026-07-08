@@ -31,3 +31,17 @@ export function validateDisplayName(raw: string): ValidationResult {
 export function newRoomId(): string {
   return nanoid();
 }
+
+/** A Room is cleaned up after this many days without any activity. */
+export const ROOM_INACTIVITY_LIMIT_DAYS = 90;
+
+/**
+ * Whether a Room is past its inactivity limit and eligible for cleanup. Mirrors
+ * the daily `pg_cron` job (see 0003_lifecycle.sql): a Room expires once its
+ * `lastActiveAt` is strictly more than 90 days before `now`. Opening a Room
+ * bumps `lastActiveAt`, so a Room in regular use never expires.
+ */
+export function isRoomExpired(lastActiveAt: Date, now: Date): boolean {
+  const ageMs = now.getTime() - lastActiveAt.getTime();
+  return ageMs > ROOM_INACTIVITY_LIMIT_DAYS * 24 * 60 * 60 * 1000;
+}

@@ -115,4 +115,59 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     const allVotes = await client.from("card_vote").select("*");
     expect(allVotes.error === null ? allVotes.data : []).toEqual([]);
   });
+
+  it("renames a Room via the capability and bumps its activity clock", async () => {
+    const id = nanoid();
+    await client.from("room").insert({ id, name: "Before" });
+
+    const renamed = await client.rpc("rename_room", {
+      p_id: id,
+      p_name: "  After  ",
+    });
+    expect(renamed.error).toBeNull();
+
+    const after = await client.rpc("get_room", { p_id: id });
+    expect(after.data).toMatchObject({ id, name: "After" });
+  });
+
+  it("cleans up a Room past the 90-day limit and keeps a fresh one (cascading)", async () => {
+    const staleAt = "2020-01-01T00:00:00Z"; // far past the 90-day limit
+    const staleId = nanoid();
+    const freshId = nanoid();
+
+    await client
+      .from("room")
+      .insert({ id: staleId, name: "Stale", last_active_at: staleAt });
+    await client.from("room").insert({ id: freshId, name: "Fresh" });
+
+    // A retro + card on the stale Room proves the delete cascades.
+    const retroId = nanoid();
+    await client
+      .from("retrospective")
+      .insert({ id: retroId, room_id: staleId, date: "2020-01-01" });
+    await client.from("card").insert({
+      id: nanoid(),
+      retrospective_id: retroId,
+      column_id: "praise",
+      text: "Old note",
+      author_client_id: nanoid(),
+    });
+
+    const cleanup = await client.rpc("cleanup_stale_rooms");
+    expect(cleanup.error).toBeNull();
+
+    // Stale Room gone; its retro data cascaded away.
+    const stale = await client.rpc("get_room", { p_id: staleId });
+    expect(stale.data).toBeNull();
+    const staleRetros = await client.rpc("list_retrospectives", {
+      p_room_id: staleId,
+    });
+    expect(staleRetros.data ?? []).toEqual([]);
+    const staleCards = await client.rpc("list_cards", { p_room_id: staleId });
+    expect(staleCards.data ?? []).toEqual([]);
+
+    // Fresh Room retained.
+    const fresh = await client.rpc("get_room", { p_id: freshId });
+    expect(fresh.data).toMatchObject({ id: freshId });
+  });
 });

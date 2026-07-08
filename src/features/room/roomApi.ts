@@ -33,3 +33,16 @@ export async function touchRoom(id: string): Promise<void> {
   const { error } = await supabase.rpc("touch_room", { p_id: id });
   if (error) throw error;
 }
+
+/**
+ * Rename a Room. Goes through the `rename_room` capability RPC (the `room` table
+ * has no UPDATE policy — see ADR 0002); the RPC re-validates the name and bumps
+ * the activity clock. Any Member who can reach the Room may rename it.
+ */
+export async function renameRoom(id: string, name: string): Promise<void> {
+  const { error } = await supabase.rpc("rename_room", {
+    p_id: id,
+    p_name: name,
+  });
+  if (error) throw error;
+}
