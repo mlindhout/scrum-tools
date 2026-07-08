@@ -114,25 +114,27 @@ export async function updateRetrospectiveDate(
   id: string,
   date: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("retrospective")
-    .update({ date })
-    .eq("id", id);
+  const { error } = await supabase.rpc("update_retrospective_date", {
+    p_id: id,
+    p_date: date,
+  });
   if (error) throw error;
 }
 
 /**
  * Lock or unlock a Retrospective. A locked retro is read-only in the app layer
- * (any Member may flip this); the lock itself rides the existing update policy.
+ * (any Member may flip this). Goes through the `set_retrospective_locked`
+ * capability RPC: a filtered UPDATE can't see rows with no SELECT policy, so
+ * edits route through security-definer RPCs keyed by the known id (ADR 0002).
  */
 export async function setRetrospectiveLocked(
   id: string,
   locked: boolean,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("retrospective")
-    .update({ locked })
-    .eq("id", id);
+  const { error } = await supabase.rpc("set_retrospective_locked", {
+    p_id: id,
+    p_locked: locked,
+  });
   if (error) throw error;
 }
 
@@ -166,13 +168,16 @@ export async function createCard(
 
 /** Edit a Card's text (author-only; enforced by the caller). */
 export async function updateCardText(id: string, text: string): Promise<void> {
-  const { error } = await supabase.from("card").update({ text }).eq("id", id);
+  const { error } = await supabase.rpc("update_card_text", {
+    p_id: id,
+    p_text: text,
+  });
   if (error) throw error;
 }
 
 /** Delete a Card (author-only; enforced by the caller). */
 export async function deleteCard(id: string): Promise<void> {
-  const { error } = await supabase.from("card").delete().eq("id", id);
+  const { error } = await supabase.rpc("delete_card", { p_id: id });
   if (error) throw error;
 }
 
@@ -188,18 +193,26 @@ export async function listCardVotes(roomId: string): Promise<CardVote[]> {
   }));
 }
 
-/** Add a Member's +1 to a Card; the composite PK makes it one-per-`clientId`. */
+/**
+ * Add a Member's +1 to a Card; the composite PK makes it one-per-`clientId`.
+ *
+ * A plain insert, not an upsert. PostgREST compiles `.upsert()` to
+ * `INSERT ... ON CONFLICT`, whose conflict arbiter is checked against the
+ * table's SELECT *policy* — but card_vote deliberately has none, so it cannot
+ * be enumerated (ADR 0002). With no SELECT policy the arbiter check fails with
+ * "new row violates row-level security policy" even for a brand-new row. So we
+ * insert plainly and swallow the unique-violation: a duplicate +1 is already a
+ * no-op by the composite PK (and the UI only calls this when not yet voted).
+ */
 export async function addCardVote(
   cardId: string,
   clientId: string,
 ): Promise<void> {
   const { error } = await supabase
     .from("card_vote")
-    .upsert(
-      { card_id: cardId, client_id: clientId },
-      { onConflict: "card_id,client_id", ignoreDuplicates: true },
-    );
-  if (error) throw error;
+    .insert({ card_id: cardId, client_id: clientId });
+  // 23505 = this Member already +1'd this Card; idempotent, so not an error.
+  if (error && error.code !== "23505") throw error;
 }
 
 /** Remove a Member's +1 from a Card (idempotent). */
@@ -207,11 +220,10 @@ export async function removeCardVote(
   cardId: string,
   clientId: string,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("card_vote")
-    .delete()
-    .eq("card_id", cardId)
-    .eq("client_id", clientId);
+  const { error } = await supabase.rpc("remove_card_vote", {
+    p_card_id: cardId,
+    p_client_id: clientId,
+  });
   if (error) throw error;
 }
 
@@ -250,21 +262,25 @@ export async function updateAction(
   description: string,
   assignee: string | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("action")
-    .update({ description, assignee })
-    .eq("id", id);
+  const { error } = await supabase.rpc("update_action", {
+    p_id: id,
+    p_description: description,
+    p_assignee: assignee,
+  });
   if (error) throw error;
 }
 
 /** Mark an Action done or un-done (open to any Member). */
 export async function setActionDone(id: string, done: boolean): Promise<void> {
-  const { error } = await supabase.from("action").update({ done }).eq("id", id);
+  const { error } = await supabase.rpc("set_action_done", {
+    p_id: id,
+    p_done: done,
+  });
   if (error) throw error;
 }
 
 /** Delete an Action (open to any Member). */
 export async function deleteAction(id: string): Promise<void> {
-  const { error } = await supabase.from("action").delete().eq("id", id);
+  const { error } = await supabase.rpc("delete_action", { p_id: id });
   if (error) throw error;
 }
