@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues en PRDs leven als markdown-bestanden onder `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Issues en PRDs leven als GitHub issues (`mlindhout/scrum-tools`) via de `gh` CLI; externe PRs zijn geen triage-surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
