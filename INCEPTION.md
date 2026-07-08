@@ -45,4 +45,4 @@ I want an app to support two essential Scrum tools: planning poker and retrospec
 - NodeJS/Typescript
 - React
 - Tailwind 4
-- 
+- Deployed on a free cloud provider
