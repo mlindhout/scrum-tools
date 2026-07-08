@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveDisplayName, type PresentMember } from "../../domain/identity";
+import { validateRoomName } from "../../domain/room";
 import { PokerTable } from "../poker/PokerTable";
 import { usePokerRound } from "../poker/usePokerRound";
 import { RetroBoard } from "../retro/RetroBoard";
+import { useRoomName } from "./useRoomName";
 
 interface RoomShellProps {
   room: { id: string; name: string };
@@ -26,10 +28,26 @@ export function RoomShell({
   const [tab, setTab] = useState<Tab>("poker");
   // Kept mounted across tabs so every present Member stays on the poker table.
   const round = usePokerRound(room.id, { clientId, name }, roster);
+  const { roomName, rename } = useRoomName(room.id, room.name);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editingRoom, setEditingRoom] = useState(false);
+  const [roomDraft, setRoomDraft] = useState(room.name);
+  const [roomError, setRoomError] = useState<string | null>(null);
+
+  function saveRoomName(e: React.FormEvent) {
+    e.preventDefault();
+    const result = validateRoomName(roomDraft);
+    if (!result.ok) {
+      setRoomError(result.error);
+      return;
+    }
+    void rename(result.name);
+    setEditingRoom(false);
+    setRoomError(null);
+  }
 
   function saveName(e: React.FormEvent) {
     e.preventDefault();
@@ -64,7 +82,42 @@ export function RoomShell({
     <div className="min-h-dvh bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-3">
-          <h1 className="mr-auto text-lg font-bold">{room.name}</h1>
+          {editingRoom ? (
+            <form
+              onSubmit={saveRoomName}
+              className="mr-auto flex items-center gap-2"
+            >
+              <input
+                autoFocus
+                value={roomDraft}
+                onChange={(e) => {
+                  setRoomDraft(e.target.value);
+                  setRoomError(null);
+                }}
+                className="rounded border border-slate-300 px-2 py-1 text-lg font-bold"
+                aria-label="Room name"
+              />
+              <button type="submit" className="text-sm font-medium">
+                Save
+              </button>
+              {roomError && (
+                <span className="text-sm text-red-600">{roomError}</span>
+              )}
+            </form>
+          ) : (
+            <div className="mr-auto flex items-center gap-2">
+              <h1 className="text-lg font-bold">{roomName}</h1>
+              <button
+                onClick={() => {
+                  setRoomDraft(roomName);
+                  setEditingRoom(true);
+                }}
+                className="text-sm text-slate-500 underline"
+              >
+                Rename
+              </button>
+            </div>
+          )}
           <button
             onClick={share}
             className="rounded-md border border-slate-300 px-3 py-1 text-sm"
