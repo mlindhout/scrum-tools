@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import type { Mode } from "../domain/round";
 
 /**
  * Local-storage backed identity. The `clientId` is generated once per browser
@@ -9,6 +10,7 @@ import { nanoid } from "nanoid";
 const CLIENT_ID_KEY = "scrum-tools:clientId";
 const NAME_KEY = "scrum-tools:name";
 const LAST_ROOM_KEY = "scrum-tools:lastRoom";
+const MODE_KEY = (roomId: string): string => `scrum-tools:mode:${roomId}`;
 
 /** The stable per-browser `clientId`, generated and persisted on first use. */
 export function getOrCreateClientId(): string {
@@ -37,4 +39,19 @@ export function setLastRoomId(roomId: string): void {
 
 export function clearLastRoomId(): void {
   localStorage.removeItem(LAST_ROOM_KEY);
+}
+
+/**
+ * The Participant/Spectator mode chosen for a specific Room. Unlike the globally
+ * remembered name, the mode is per-Room (you may estimate in one Room and only
+ * facilitate in another). Defaults to Participant when nothing is stored.
+ */
+export function getRoomMode(roomId: string): Mode {
+  return localStorage.getItem(MODE_KEY(roomId)) === "spectator"
+    ? "spectator"
+    : "participant";
+}
+
+export function setRoomMode(roomId: string, mode: Mode): void {
+  localStorage.setItem(MODE_KEY(roomId), mode);
 }

@@ -7,10 +7,13 @@
  */
 
 import { validateDisplayName } from "./room";
+import type { Mode } from "./round";
 
 export interface PresentMember {
   clientId: string;
   name: string;
+  /** Poker mode carried on the roster; absent is treated as Participant. */
+  mode?: Mode;
 }
 
 const normalize = (name: string): string => name.trim().toLowerCase();

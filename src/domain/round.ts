@@ -6,8 +6,10 @@
  * values); vote secrecy is a transport concern, so this model holds the full
  * logical truth (see ADR 0005).
  *
- * For this slice every present Member is a Participant; Spectator mode (and a
- * `setMode` event) arrive in a later slice.
+ * Each Member is a Participant (has a card, votes, counts toward the Reveal) or
+ * a Spectator (present, no card, not counted — this is how a non-estimating
+ * facilitator takes part). The all-voted Reveal needs ≥1 Participant, so a round
+ * of only Spectators waits for the timer (see ADR 0003).
  */
 
 /** The fixed voting Deck. `?` means "cannot estimate" and sorts last. */
@@ -30,10 +32,19 @@ export type DeckValue = (typeof DECK)[number];
 /** How long a Round runs before it reveals on timeout. */
 export const ROUND_DURATION_MS = 30_000;
 
+/** Participant votes and counts toward the Reveal; Spectator only watches. */
+export type Mode = "participant" | "spectator";
+
 export interface Member {
   clientId: string;
   name: string;
+  /** Absent is treated as Participant, so a mode-less roster still estimates. */
+  mode?: Mode;
 }
+
+/** A Member counts toward the round unless they've explicitly gone Spectator. */
+export const isParticipant = (member: Member): boolean =>
+  member.mode !== "spectator";
 
 export type RoundPhase = "idle" | "voting" | "revealed";
 
@@ -53,6 +64,7 @@ export type RoundEvent =
   | { type: "withdrawVote"; clientId: string }
   | { type: "memberJoined"; member: Member }
   | { type: "memberLeft"; clientId: string }
+  | { type: "setMode"; clientId: string; mode: Mode }
   | { type: "timeout" };
 
 /** A fresh Round model, optionally seeded with the present roster. */
@@ -65,12 +77,14 @@ const isPresent = (state: RoundState, clientId: string): boolean =>
 
 /**
  * Should the Round reveal now on the all-voted condition? True only in the
- * voting phase when there is ≥1 present Member and every present Member has
- * cast a vote. (Timeout reveals unconditionally and is handled separately.)
+ * voting phase when there is ≥1 present Participant and every present
+ * Participant has cast a vote. Spectators never count, so a Spectator-only
+ * round is never all-voted. (Timeout reveals unconditionally, separately.)
  */
 export function everyoneVoted(state: RoundState): boolean {
-  if (state.members.length === 0) return false;
-  return state.members.every((m) => state.votes[m.clientId] !== undefined);
+  const participants = state.members.filter(isParticipant);
+  if (participants.length === 0) return false;
+  return participants.every((m) => state.votes[m.clientId] !== undefined);
 }
 
 /** Drop a member's vote without mutating the input. */
@@ -105,7 +119,9 @@ export function roundReducer(state: RoundState, event: RoundEvent): RoundState {
 
     case "castVote": {
       if (state.phase !== "voting") return state;
-      if (!isPresent(state, event.clientId)) return state;
+      const member = state.members.find((m) => m.clientId === event.clientId);
+      // Absent members and Spectators hold no card, so cannot vote.
+      if (!member || !isParticipant(member)) return state;
       return maybeReveal({
         ...state,
         votes: { ...state.votes, [event.clientId]: event.value },
@@ -136,6 +152,20 @@ export function roundReducer(state: RoundState, event: RoundEvent): RoundState {
       });
     }
 
+    case "setMode": {
+      if (!isPresent(state, event.clientId)) return state;
+      const members = state.members.map((m) =>
+        m.clientId === event.clientId ? { ...m, mode: event.mode } : m,
+      );
+      // A Spectator holds no Vote; dropping it may complete the round for the
+      // remaining Participants.
+      const votes =
+        event.mode === "spectator"
+          ? withoutVote(state.votes, event.clientId)
+          : state.votes;
+      return maybeReveal({ ...state, members, votes });
+    }
+
     case "timeout":
       if (state.phase !== "voting") return state;
       return { ...state, phase: "revealed" };
@@ -149,9 +179,9 @@ export interface TableCard {
   voted: boolean;
 }
 
-/** The live table: one card per present Member, in roster order. */
+/** The live table: one card per present Participant, in roster order. */
 export function tableCards(state: RoundState): TableCard[] {
-  return state.members.map((m) => ({
+  return state.members.filter(isParticipant).map((m) => ({
     clientId: m.clientId,
     name: m.name,
     voted: state.votes[m.clientId] !== undefined,
@@ -180,7 +210,7 @@ function revealRank(value: DeckValue | null): [number, number] {
  * and non-voters last. Shows the full values (secrecy ends at Reveal).
  */
 export function revealedVotes(state: RoundState): RevealedVote[] {
-  const rows: RevealedVote[] = state.members.map((m) => ({
+  const rows: RevealedVote[] = state.members.filter(isParticipant).map((m) => ({
     clientId: m.clientId,
     name: m.name,
     value: state.votes[m.clientId] ?? null,

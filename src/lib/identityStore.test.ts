@@ -3,8 +3,10 @@ import {
   clearLastRoomId,
   getLastRoomId,
   getOrCreateClientId,
+  getRoomMode,
   getStoredName,
   setLastRoomId,
+  setRoomMode,
   setStoredName,
 } from "./identityStore";
 
@@ -45,5 +47,24 @@ describe("last-used room", () => {
     setLastRoomId("gone");
     clearLastRoomId();
     expect(getLastRoomId()).toBeNull();
+  });
+});
+
+describe("per-room mode", () => {
+  it("defaults to participant when nothing is stored", () => {
+    expect(getRoomMode("room123")).toBe("participant");
+  });
+
+  it("round-trips a spectator choice per room", () => {
+    setRoomMode("room123", "spectator");
+    expect(getRoomMode("room123")).toBe("spectator");
+    // Independent per room — a different room is still the default.
+    expect(getRoomMode("other")).toBe("participant");
+  });
+
+  it("can switch back to participant", () => {
+    setRoomMode("room123", "spectator");
+    setRoomMode("room123", "participant");
+    expect(getRoomMode("room123")).toBe("participant");
   });
 });

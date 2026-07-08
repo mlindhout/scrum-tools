@@ -210,6 +210,81 @@ describe("presence during a round", () => {
   });
 });
 
+describe("spectator mode", () => {
+  it("omits spectators from the table — they have no card", () => {
+    const s = roundReducer(voting("a", "b"), {
+      type: "setMode",
+      clientId: "b",
+      mode: "spectator",
+    });
+    expect(tableCards(s).map((c) => c.clientId)).toEqual(["a"]);
+  });
+
+  it("ignores a vote cast by a spectator", () => {
+    const s = run(
+      voting("a", "b"),
+      { type: "setMode", clientId: "b", mode: "spectator" },
+      { type: "castVote", clientId: "b", value: "5" },
+    );
+    expect(s.votes).toEqual({});
+  });
+
+  it("reveals when every participant voted, not counting a spectator", () => {
+    const s = run(
+      voting("a", "b"),
+      { type: "setMode", clientId: "b", mode: "spectator" },
+      { type: "castVote", clientId: "a", value: "5" },
+    );
+    expect(s.phase).toBe("revealed");
+  });
+
+  it("does not reveal early when everyone present is a spectator", () => {
+    const s = roundReducer(voting("a"), {
+      type: "setMode",
+      clientId: "a",
+      mode: "spectator",
+    });
+    expect(everyoneVoted(s)).toBe(false);
+    expect(s.phase).toBe("voting");
+    // The timer still ends such a round.
+    expect(roundReducer(s, { type: "timeout" }).phase).toBe("revealed");
+  });
+
+  it("switching to spectator drops the vote and can complete the round", () => {
+    let s = run(voting("a", "b"), { type: "castVote", clientId: "a", value: "5" });
+    expect(s.phase).toBe("voting"); // b (a participant) has not voted yet
+    s = roundReducer(s, { type: "setMode", clientId: "b", mode: "spectator" });
+    expect(s.votes).toEqual({ a: "5" });
+    expect(s.phase).toBe("revealed"); // only participant a remains, and it voted
+  });
+
+  it("excludes spectators from the revealed votes", () => {
+    const s = run(
+      voting("a", "b"),
+      { type: "castVote", clientId: "a", value: "5" },
+      { type: "setMode", clientId: "b", mode: "spectator" },
+    );
+    expect(revealedVotes(s).map((v) => v.clientId)).toEqual(["a"]);
+  });
+
+  it("lets a member join mid-round as a spectator (no card, not counted)", () => {
+    let s = roundReducer(voting("a"), {
+      type: "memberJoined",
+      member: { clientId: "b", name: "B", mode: "spectator" },
+    });
+    expect(tableCards(s).map((c) => c.clientId)).toEqual(["a"]);
+    s = roundReducer(s, { type: "castVote", clientId: "a", value: "5" });
+    expect(s.phase).toBe("revealed");
+  });
+
+  it("ignores setMode for a member who is not present", () => {
+    const s = voting("a");
+    expect(
+      roundReducer(s, { type: "setMode", clientId: "ghost", mode: "spectator" }),
+    ).toBe(s);
+  });
+});
+
 describe("timeout", () => {
   it("reveals the round even with non-voters", () => {
     const s = run(

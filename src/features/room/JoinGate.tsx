@@ -4,13 +4,15 @@ import {
   suggestName,
   type PresentMember,
 } from "../../domain/identity";
+import type { Mode } from "../../domain/round";
 
 interface JoinGateProps {
   roomName: string;
   roster: PresentMember[];
   clientId: string;
   initialName: string;
-  onJoin: (name: string) => void;
+  initialMode: Mode;
+  onJoin: (name: string, mode: Mode) => void;
 }
 
 export function JoinGate({
@@ -18,11 +20,13 @@ export function JoinGate({
   roster,
   clientId,
   initialName,
+  initialMode,
   onJoin,
 }: JoinGateProps) {
   const [name, setName] = useState(() =>
     suggestName(initialName, roster, clientId),
   );
+  const [spectator, setSpectator] = useState(initialMode === "spectator");
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(e: React.FormEvent) {
@@ -37,7 +41,7 @@ export function JoinGate({
         setError(`That name is taken here. Try “${outcome.suggestion}”.`);
         return;
       case "ok":
-        onJoin(outcome.name);
+        onJoin(outcome.name, spectator ? "spectator" : "participant");
     }
   }
 
@@ -64,6 +68,15 @@ export function JoinGate({
             className="rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={spectator}
+              onChange={(e) => setSpectator(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Join as spectator (watch only, don’t estimate)
+          </label>
           <button
             type="submit"
             className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white"

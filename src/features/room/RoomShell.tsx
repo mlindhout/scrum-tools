@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveDisplayName, type PresentMember } from "../../domain/identity";
+import type { Mode } from "../../domain/round";
 import { PokerTable } from "../poker/PokerTable";
 import { usePokerRound } from "../poker/usePokerRound";
 import { RetroBoard } from "../retro/RetroBoard";
@@ -10,7 +11,9 @@ interface RoomShellProps {
   roster: PresentMember[];
   clientId: string;
   name: string;
+  mode: Mode;
   onRename: (name: string) => void;
+  onSetMode: (mode: Mode) => void;
 }
 
 type Tab = "poker" | "retro";
@@ -20,12 +23,14 @@ export function RoomShell({
   roster,
   clientId,
   name,
+  mode,
   onRename,
+  onSetMode,
 }: RoomShellProps) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("poker");
   // Kept mounted across tabs so every present Member stays on the poker table.
-  const round = usePokerRound(room.id, { clientId, name }, roster);
+  const round = usePokerRound(room.id, { clientId, name, mode }, roster);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +131,7 @@ export function RoomShell({
 
         <section className="py-8" role="tabpanel">
           {tab === "poker" ? (
-            <PokerTable round={round} />
+            <PokerTable round={round} onSetMode={onSetMode} />
           ) : (
             <RetroBoard roomId={room.id} clientId={clientId} />
           )}

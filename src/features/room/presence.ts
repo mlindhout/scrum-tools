@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 import type { PresentMember } from "../../domain/identity";
+import type { Mode } from "../../domain/round";
 
 /**
  * Room-level Presence: every client publishes its `{ clientId, name }` and
@@ -13,6 +14,7 @@ import type { PresentMember } from "../../domain/identity";
 interface PresenceMeta {
   clientId: string;
   name: string;
+  mode: Mode;
 }
 
 type PresenceState = Record<string, Array<Record<string, unknown>>>;
@@ -23,11 +25,15 @@ export function presentMembersFromState(state: PresenceState): PresentMember[] {
   const members: PresentMember[] = [];
   for (const entries of Object.values(state)) {
     for (const entry of entries) {
-      const { clientId, name } = entry;
+      const { clientId, name, mode } = entry;
       if (typeof clientId !== "string" || typeof name !== "string") continue;
       if (seen.has(clientId)) continue;
       seen.add(clientId);
-      members.push({ clientId, name });
+      members.push({
+        clientId,
+        name,
+        mode: mode === "spectator" ? "spectator" : "participant",
+      });
     }
   }
   return members;
@@ -57,7 +63,11 @@ export function useRoomPresence(
       })
       .subscribe((status) => {
         if (status === "SUBSCRIBED" && self) {
-          void channel.track({ clientId: self.clientId, name: self.name });
+          void channel.track({
+        clientId: self.clientId,
+        name: self.name,
+        mode: self.mode,
+      });
         }
       });
 
@@ -73,9 +83,13 @@ export function useRoomPresence(
   useEffect(() => {
     const channel = channelRef.current;
     if (channel && self) {
-      void channel.track({ clientId: self.clientId, name: self.name });
+      void channel.track({
+        clientId: self.clientId,
+        name: self.name,
+        mode: self.mode,
+      });
     }
-  }, [self?.clientId, self?.name]);
+  }, [self?.clientId, self?.name, self?.mode]);
 
   return members;
 }

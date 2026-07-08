@@ -5,10 +5,13 @@ import { JoinGate } from "../features/room/JoinGate";
 import { RoomShell } from "../features/room/RoomShell";
 import { useRoomPresence } from "../features/room/presence";
 import { fetchRoom, touchRoom, type Room } from "../features/room/roomApi";
+import type { Mode } from "../domain/round";
 import {
   clearLastRoomId,
   getLastRoomId,
+  getRoomMode,
   setLastRoomId,
+  setRoomMode,
 } from "../lib/identityStore";
 
 type LoadState =
@@ -21,6 +24,17 @@ export function RoomPage() {
   const { clientId, name, setName } = useIdentity();
   const [load, setLoad] = useState<LoadState>({ status: "loading" });
   const [joined, setJoined] = useState(false);
+  // Participant/Spectator is remembered per Room (see identityStore).
+  const [mode, setModeState] = useState<Mode>("participant");
+
+  useEffect(() => {
+    setModeState(getRoomMode(roomId));
+  }, [roomId]);
+
+  const setMode = (next: Mode) => {
+    setRoomMode(roomId, next);
+    setModeState(next);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +61,7 @@ export function RoomPage() {
   // Observe the roster before joining (for the name check); track once joined.
   const roster = useRoomPresence(
     roomId,
-    joined && name ? { clientId, name } : null,
+    joined && name ? { clientId, name, mode } : null,
   );
 
   if (load.status === "loading") {
@@ -84,8 +98,10 @@ export function RoomPage() {
         roster={roster}
         clientId={clientId}
         initialName={name ?? ""}
-        onJoin={(chosen) => {
+        initialMode={mode}
+        onJoin={(chosen, chosenMode) => {
           setName(chosen);
+          setMode(chosenMode);
           setJoined(true);
         }}
       />
@@ -98,7 +114,9 @@ export function RoomPage() {
       roster={roster}
       clientId={clientId}
       name={name}
+      mode={mode}
       onRename={setName}
+      onSetMode={setMode}
     />
   );
 }

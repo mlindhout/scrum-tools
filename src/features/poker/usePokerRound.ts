@@ -4,8 +4,10 @@ import { supabase } from "../../lib/supabase";
 import type { PresentMember } from "../../domain/identity";
 import {
   ROUND_DURATION_MS,
+  isParticipant,
   revealedVotes,
   type DeckValue,
+  type Mode,
   type RevealedVote,
   type RoundState,
   type TableCard,
@@ -29,6 +31,7 @@ import {
 interface Self {
   clientId: string;
   name: string;
+  mode: Mode;
 }
 
 export interface PokerRound {
@@ -37,6 +40,8 @@ export interface PokerRound {
   table: TableCard[];
   myVote: DeckValue | null;
   reveal: RevealedVote[] | null;
+  /** True when I am a Spectator: no card, no vote, but I still see the table. */
+  isSpectator: boolean;
   startRound: () => void;
   castVote: (value: DeckValue) => void;
 }
@@ -161,12 +166,15 @@ export function usePokerRound(
   const expired = startedAt !== null && remaining === 0;
 
   // Reveal fires locally on all-voted or timeout; each client then broadcasts
-  // its own value so the full result assembles across the room.
-  const presentIds = roster.map((m) => m.clientId);
+  // its own value so the full result assembles across the room. Only present
+  // Participants are counted, and the all-voted path needs ≥1 of them, so a
+  // Spectator-only round waits for the timer (mirrors the pure reducer).
+  const participants = roster.filter(isParticipant);
   const everyoneVoted =
-    presentIds.length > 0 &&
-    presentIds.every(
-      (id) => votedIds[id] || (id === self.clientId && myVote !== null),
+    participants.length > 0 &&
+    participants.every(
+      (m) =>
+        votedIds[m.clientId] || (m.clientId === self.clientId && myVote !== null),
     );
 
   useEffect(() => {
@@ -193,18 +201,29 @@ export function usePokerRound(
   const castVote = useCallback(
     (value: DeckValue) => {
       if (startedAt === null || revealed) return;
+      if (self.mode === "spectator") return; // Spectators hold no card.
       const next = value === state.current.myVote ? null : value;
       setMyVote(next);
       track({ voted: next !== null });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [startedAt, revealed, track],
+    [startedAt, revealed, track, self.mode],
   );
+
+  // Becoming a Spectator drops any card I was holding, so the table and the
+  // reveal count no longer include me.
+  useEffect(() => {
+    if (self.mode === "spectator" && myVote !== null) {
+      setMyVote(null);
+      track({ voted: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [self.mode]);
 
   const phase: PokerRound["phase"] =
     startedAt === null ? "idle" : revealed ? "revealed" : "voting";
 
-  const table: TableCard[] = roster.map((m) => ({
+  const table: TableCard[] = roster.filter(isParticipant).map((m) => ({
     clientId: m.clientId,
     name: m.name,
     voted:
@@ -231,6 +250,7 @@ export function usePokerRound(
     table,
     myVote,
     reveal,
+    isSpectator: self.mode === "spectator",
     startRound,
     castVote,
   };
