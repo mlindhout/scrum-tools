@@ -121,6 +121,21 @@ export async function updateRetrospectiveDate(
   if (error) throw error;
 }
 
+/**
+ * Lock or unlock a Retrospective. A locked retro is read-only in the app layer
+ * (any Member may flip this); the lock itself rides the existing update policy.
+ */
+export async function setRetrospectiveLocked(
+  id: string,
+  locked: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("retrospective")
+    .update({ locked })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 /** All Cards across a Room's Retrospectives (filter by retro in the UI). */
 export async function listCards(roomId: string): Promise<Card[]> {
   const { data, error } = await supabase.rpc("list_cards", {

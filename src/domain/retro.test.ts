@@ -8,6 +8,7 @@ import {
   defaultRetroDate,
   hasVoted,
   isColumnId,
+  isRetrospectiveLocked,
   normalizeAssignee,
   sortRetrospectivesNewestFirst,
   toggleCardVote,
@@ -72,10 +73,26 @@ describe("validateCardText", () => {
 });
 
 describe("canModifyCard", () => {
+  const unlocked = { locked: false };
+  const locked = { locked: true };
+
   it("only the author (by clientId) may edit or delete a Card", () => {
     const card = { authorClientId: "abc" };
-    expect(canModifyCard(card, "abc")).toBe(true);
-    expect(canModifyCard(card, "xyz")).toBe(false);
+    expect(canModifyCard(card, "abc", unlocked)).toBe(true);
+    expect(canModifyCard(card, "xyz", unlocked)).toBe(false);
+  });
+
+  it("nobody may modify a Card on a locked Retrospective (read-only)", () => {
+    const card = { authorClientId: "abc" };
+    expect(canModifyCard(card, "abc", locked)).toBe(false);
+    expect(canModifyCard(card, "xyz", locked)).toBe(false);
+  });
+});
+
+describe("isRetrospectiveLocked", () => {
+  it("reflects the Retrospective's locked flag", () => {
+    expect(isRetrospectiveLocked({ locked: true })).toBe(true);
+    expect(isRetrospectiveLocked({ locked: false })).toBe(false);
   });
 });
 

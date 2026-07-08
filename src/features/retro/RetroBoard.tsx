@@ -6,6 +6,7 @@ import {
   canModifyCard,
   defaultRetroDate,
   hasVoted,
+  isRetrospectiveLocked,
   normalizeAssignee,
   sortRetrospectivesNewestFirst,
   validateActionDescription,
@@ -29,6 +30,7 @@ import {
   listRetrospectives,
   removeCardVote,
   setActionDone,
+  setRetrospectiveLocked,
   updateAction,
   updateCardText,
   updateRetrospectiveDate,
@@ -135,6 +137,7 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
   }
 
   const selectedCards = cards.filter((c) => c.retrospectiveId === selected.id);
+  const locked = isRetrospectiveLocked(selected);
 
   return (
     <div className="flex flex-col gap-4">
@@ -159,21 +162,43 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
           type="date"
           aria-label="Retrospective date"
           value={selected.date}
+          disabled={locked}
           onChange={(e) =>
             void mutate(() =>
               updateRetrospectiveDate(selected.id, e.target.value),
             )
           }
-          className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-900"
+          className="rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 disabled:opacity-50"
         />
 
         <button
+          onClick={() =>
+            void mutate(() => setRetrospectiveLocked(selected.id, !locked))
+          }
+          aria-pressed={locked}
+          className={`ml-auto rounded-md px-3 py-1 text-sm font-medium ${
+            locked
+              ? "bg-amber-500 text-white"
+              : "border border-slate-300 text-slate-700"
+          }`}
+        >
+          {locked ? "🔒 Locked" : "🔓 Lock"}
+        </button>
+
+        <button
           onClick={() => void handleCreateRetro()}
-          className="ml-auto rounded-md border border-slate-300 px-3 py-1 text-sm"
+          className="rounded-md border border-slate-300 px-3 py-1 text-sm"
         >
           New retrospective
         </button>
       </div>
+
+      {locked && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          This retrospective is locked — cards, +1's and actions are read-only.
+          Unlock it to make changes.
+        </p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         {COLUMNS.map((column) => (
@@ -183,6 +208,7 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
             cards={cardsInColumn(selectedCards, column.id)}
             clientId={clientId}
             votes={votes}
+            locked={locked}
             onAdd={(text) =>
               mutate(() =>
                 createCard(selected.id, column.id, text, clientId),
@@ -204,6 +230,7 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
 
       <ActionsList
         actions={actionsInRetrospective(actions, selected.id)}
+        locked={locked}
         onToggleDone={(id, done) => mutate(() => setActionDone(id, done))}
         onEdit={(action) => setActionModal({ mode: "edit", action })}
         onDelete={(id) => mutate(() => deleteAction(id))}
@@ -229,11 +256,13 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
 
 function ActionsList({
   actions,
+  locked,
   onToggleDone,
   onEdit,
   onDelete,
 }: {
   actions: Action[];
+  locked: boolean;
   onToggleDone: (id: string, done: boolean) => Promise<void>;
   onEdit: (action: Action) => void;
   onDelete: (id: string) => Promise<void>;
@@ -255,6 +284,7 @@ function ActionsList({
               <input
                 type="checkbox"
                 checked={action.done}
+                disabled={locked}
                 aria-label={action.done ? "Mark not done" : "Mark done"}
                 onChange={() => void onToggleDone(action.id, !action.done)}
                 className="h-4 w-4"
@@ -273,18 +303,22 @@ function ActionsList({
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => onEdit(action)}
-                className="text-xs text-slate-500 underline"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => void onDelete(action.id)}
-                className="text-xs text-red-600 underline"
-              >
-                Delete
-              </button>
+              {!locked && (
+                <>
+                  <button
+                    onClick={() => onEdit(action)}
+                    className="text-xs text-slate-500 underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => void onDelete(action.id)}
+                    className="text-xs text-red-600 underline"
+                  >
+                    Delete
+                  </button>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -378,6 +412,7 @@ function ColumnPanel({
   cards,
   clientId,
   votes,
+  locked,
   onAdd,
   onEdit,
   onDelete,
@@ -388,6 +423,7 @@ function ColumnPanel({
   cards: Card[];
   clientId: string;
   votes: CardVote[];
+  locked: boolean;
   onAdd: (text: string) => Promise<void>;
   onEdit: (id: string, text: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -418,7 +454,8 @@ function ColumnPanel({
           <CardItem
             key={card.id}
             card={card}
-            mine={canModifyCard(card, clientId)}
+            mine={canModifyCard(card, clientId, { locked })}
+            locked={locked}
             voteCount={voteCount(votes, card.id)}
             voted={hasVoted(votes, card.id, clientId)}
             onEdit={onEdit}
@@ -429,25 +466,27 @@ function ColumnPanel({
         ))}
       </ul>
 
-      <form onSubmit={submit} className="mt-1 flex flex-col gap-1">
-        <textarea
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setError(null);
-          }}
-          placeholder="Add a card…"
-          rows={2}
-          className="resize-none rounded border border-slate-300 px-2 py-1 text-sm"
-        />
-        {error && <span className="text-xs text-red-600">{error}</span>}
-        <button
-          type="submit"
-          className="self-start rounded-md bg-slate-900 px-3 py-1 text-sm font-medium text-white"
-        >
-          Add
-        </button>
-      </form>
+      {!locked && (
+        <form onSubmit={submit} className="mt-1 flex flex-col gap-1">
+          <textarea
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError(null);
+            }}
+            placeholder="Add a card…"
+            rows={2}
+            className="resize-none rounded border border-slate-300 px-2 py-1 text-sm"
+          />
+          {error && <span className="text-xs text-red-600">{error}</span>}
+          <button
+            type="submit"
+            className="self-start rounded-md bg-slate-900 px-3 py-1 text-sm font-medium text-white"
+          >
+            Add
+          </button>
+        </form>
+      )}
     </section>
   );
 }
@@ -479,6 +518,7 @@ function useLongPress(onLongPress: () => void) {
 function CardItem({
   card,
   mine,
+  locked,
   voteCount,
   voted,
   onEdit,
@@ -488,6 +528,7 @@ function CardItem({
 }: {
   card: Card;
   mine: boolean;
+  locked: boolean;
   voteCount: number;
   voted: boolean;
   onEdit: (id: string, text: string) => Promise<void>;
@@ -498,7 +539,8 @@ function CardItem({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card.text);
   const [error, setError] = useState<string | null>(null);
-  const longPress = useLongPress(onCreateAction);
+  // No-op the long-press/create-action affordances while locked (read-only).
+  const longPress = useLongPress(locked ? () => {} : onCreateAction);
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -551,6 +593,7 @@ function CardItem({
   return (
     <li
       onContextMenu={(e) => {
+        if (locked) return;
         e.preventDefault();
         onCreateAction();
       }}
@@ -561,9 +604,10 @@ function CardItem({
       <div className="mt-1 flex items-center gap-2 text-xs">
         <button
           onClick={() => void onToggleVote(card.id)}
+          disabled={locked}
           aria-pressed={voted}
           aria-label={voted ? "Remove your +1" : "Add a +1"}
-          className={`rounded-full border px-2 py-0.5 font-medium ${
+          className={`rounded-full border px-2 py-0.5 font-medium disabled:opacity-60 ${
             voted
               ? "border-slate-900 bg-slate-900 text-white"
               : "border-slate-300 text-slate-600"
@@ -571,14 +615,16 @@ function CardItem({
         >
           +1 {voteCount}
         </button>
-        <button
-          onClick={onCreateAction}
-          aria-label="Create action"
-          title="Create action"
-          className="rounded-full border border-slate-300 px-2 py-0.5 font-medium text-slate-600"
-        >
-          ➤ Action
-        </button>
+        {!locked && (
+          <button
+            onClick={onCreateAction}
+            aria-label="Create action"
+            title="Create action"
+            className="rounded-full border border-slate-300 px-2 py-0.5 font-medium text-slate-600"
+          >
+            ➤ Action
+          </button>
+        )}
         {mine && (
           <>
             <button

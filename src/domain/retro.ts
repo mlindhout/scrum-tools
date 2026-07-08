@@ -140,12 +140,27 @@ export function normalizeAssignee(
   return trimmed.length === 0 ? null : trimmed;
 }
 
-/** Only the author (by `clientId`) may edit or delete their own Card. */
+/**
+ * A locked Retrospective is fully read-only (PRD): no Cards may be placed,
+ * edited or deleted, no +1's toggled and no Actions created, edited, toggled or
+ * deleted. Any Member may lock or unlock; a new Retrospective starts unlocked.
+ */
+export function isRetrospectiveLocked(
+  retro: Pick<Retrospective, "locked">,
+): boolean {
+  return retro.locked;
+}
+
+/**
+ * Whether a Member may edit or delete a Card: only the author (by `clientId`),
+ * and never while the Retrospective is locked (the whole board is read-only).
+ */
 export function canModifyCard(
   card: Pick<Card, "authorClientId">,
   clientId: string,
+  retro: Pick<Retrospective, "locked">,
 ): boolean {
-  return card.authorClientId === clientId;
+  return !isRetrospectiveLocked(retro) && card.authorClientId === clientId;
 }
 
 /** A copy of the retrospectives ordered newest first (by creation time). */

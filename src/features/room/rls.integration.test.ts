@@ -137,6 +137,46 @@ describe.skipIf(!enabled)("room RLS capability", () => {
     expect(allActions.error === null ? allActions.data : []).toEqual([]);
   });
 
+  it("starts a Retrospective unlocked and can lock and unlock it", async () => {
+    const roomId = nanoid();
+    await client.from("room").insert({ id: roomId, name: "Lock room" });
+
+    const retroId = nanoid();
+    await client
+      .from("retrospective")
+      .insert({ id: retroId, room_id: roomId, date: "2026-07-08" });
+
+    // A new Retrospective starts unlocked.
+    const initial = await client.rpc("list_retrospectives", {
+      p_room_id: roomId,
+    });
+    expect(initial.data?.[0]).toMatchObject({ id: retroId, locked: false });
+
+    // Any Member may lock it (open update policy; enforcement is app-layer).
+    const lock = await client
+      .from("retrospective")
+      .update({ locked: true })
+      .eq("id", retroId);
+    expect(lock.error).toBeNull();
+
+    const locked = await client.rpc("list_retrospectives", {
+      p_room_id: roomId,
+    });
+    expect(locked.data?.[0]).toMatchObject({ locked: true });
+
+    // And unlock it again.
+    const unlock = await client
+      .from("retrospective")
+      .update({ locked: false })
+      .eq("id", retroId);
+    expect(unlock.error).toBeNull();
+
+    const unlocked = await client.rpc("list_retrospectives", {
+      p_room_id: roomId,
+    });
+    expect(unlocked.data?.[0]).toMatchObject({ locked: false });
+  });
+
   it("renames a Room via the capability and bumps its activity clock", async () => {
     const id = nanoid();
     await client.from("room").insert({ id, name: "Before" });
