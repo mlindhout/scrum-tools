@@ -7,6 +7,40 @@ Workers.
 
 **Live demo:** <https://scrum-tools.mlindhout.workers.dev/>
 
+## How this was built
+
+This app is a showcase of AI-assisted coding: I set the direction, agents did the
+build. Every step left an artifact in this repo, so you can follow the trail.
+
+1. **Inception.** I wrote a rough spec by hand — [`INCEPTION.md`](./INCEPTION.md):
+   two Scrum tools, accountless rooms, a Fibonacci deck, a three-column retro. No
+   architecture, just intent.
+2. **Grilling.** I ran the `grill-with-docs` skill from
+   [Matt Pocock's skills](https://github.com/mattpocock/skills) — a relentless
+   interview that made me decide, not the model. The real calls came out here: no
+   separate facilitator role, vote secrecy handled at the UI level, a
+   capability-based RLS pattern. Those decisions were captured as a domain glossary
+   ([`CONTEXT.md`](./CONTEXT.md)) and a set of [ADRs](./docs/adr/).
+3. **PRD.** The `to-prd` skill synthesised that conversation into a product
+   requirements doc and published it to the GitHub issue tracker — no new
+   interview, just what we'd already settled.
+4. **Issues.** The `to-issues` skill sliced the PRD into independently-grabbable
+   [tracer-bullet issues](https://github.com/mlindhout/scrum-tools/issues?q=is%3Aissue),
+   each a thin vertical slice through the whole stack.
+5. **Autonomous build.** [Sandcastle](https://github.com/mattpocock/sandcastle)
+   (the [`.sandcastle/`](./.sandcastle/) orchestrator) took it from there: it built
+   a dependency graph over the open issues, spun up a sandbox per unblocked issue,
+   ran an implementer then a reviewer on each branch concurrently, and merged the
+   results — looping until the backlog was empty.
+
+The stack the agents landed on: a Vite + React + Tailwind 4 SPA talking directly to
+[Supabase](https://supabase.com) under row-level security, deployed as static assets
+on [Cloudflare Workers](https://developers.cloudflare.com/workers/). The whole chain
+ran on [Claude Code](https://claude.com/claude-code).
+
+The agents shipped working software; the finishing touches — getting the RLS grants
+right, the pastel colours in the retro, the move to Cloudflare — I did by hand.
+
 ## Develop
 
 ```bash
