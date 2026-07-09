@@ -15,6 +15,7 @@ import {
   type Action,
   type Card,
   type CardVote,
+  type ColumnId,
   type Retrospective,
 } from "../../domain/retro";
 import {
@@ -41,6 +42,31 @@ interface RetroBoardProps {
   roomId: string;
   clientId: string;
 }
+
+/**
+ * Pastel accent per Column: praise green, start blue, stop red. Cards sit one
+ * step darker than their column so they read as raised against the panel.
+ */
+const COLUMN_ACCENT: Record<
+  ColumnId,
+  { section: string; title: string; card: string }
+> = {
+  praise: {
+    section: "border-green-200 bg-green-50",
+    title: "text-green-800",
+    card: "border-green-300 bg-green-100",
+  },
+  start: {
+    section: "border-blue-200 bg-blue-50",
+    title: "text-blue-800",
+    card: "border-blue-300 bg-blue-100",
+  },
+  stop: {
+    section: "border-red-200 bg-red-50",
+    title: "text-red-800",
+    card: "border-red-300 bg-red-100",
+  },
+};
 
 /**
  * The persistent, live retrospective board. Thin shell over the pure domain
@@ -205,6 +231,7 @@ export function RetroBoard({ roomId, clientId }: RetroBoardProps) {
         {COLUMNS.map((column) => (
           <ColumnPanel
             key={column.id}
+            columnId={column.id}
             title={column.title}
             cards={cardsInColumn(selectedCards, column.id)}
             clientId={clientId}
@@ -409,6 +436,7 @@ function ActionModal({
 }
 
 function ColumnPanel({
+  columnId,
   title,
   cards,
   clientId,
@@ -420,6 +448,7 @@ function ColumnPanel({
   onToggleVote,
   onCreateAction,
 }: {
+  columnId: ColumnId;
   title: string;
   cards: Card[];
   clientId: string;
@@ -433,6 +462,7 @@ function ColumnPanel({
 }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const accent = COLUMN_ACCENT[columnId];
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -447,14 +477,17 @@ function ColumnPanel({
   }
 
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3">
-      <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
+    <section
+      className={`flex flex-col gap-2 rounded-xl border p-3 ${accent.section}`}
+    >
+      <h3 className={`text-sm font-semibold ${accent.title}`}>{title}</h3>
 
       <ul className="flex flex-col gap-2">
         {cards.map((card) => (
           <CardItem
             key={card.id}
             card={card}
+            cardClass={accent.card}
             mine={canModifyCard(card, clientId, { locked })}
             locked={locked}
             voteCount={voteCount(votes, card.id)}
@@ -518,6 +551,7 @@ function useLongPress(onLongPress: () => void) {
 
 function CardItem({
   card,
+  cardClass,
   mine,
   locked,
   voteCount,
@@ -528,6 +562,7 @@ function CardItem({
   onCreateAction,
 }: {
   card: Card;
+  cardClass: string;
   mine: boolean;
   locked: boolean;
   voteCount: number;
@@ -599,7 +634,7 @@ function CardItem({
         onCreateAction();
       }}
       {...longPress}
-      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+      className={`rounded-lg border px-3 py-2 text-sm text-slate-800 ${cardClass}`}
     >
       <p className="whitespace-pre-wrap break-words">{card.text}</p>
       <div className="mt-1 flex items-center gap-2 text-xs">
