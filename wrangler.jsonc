@@ -1,0 +1,14 @@
+{
+  // Cloudflare Workers static-assets deploy for the Vite SPA.
+  // `npm run build` produces ./dist; `npx wrangler deploy` uploads it.
+  // No Worker script — this is an assets-only Worker (the browser talks to
+  // Supabase directly, see docs/adr/0001 & 0002).
+  "name": "scrum-tools",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./dist",
+    // SPA fallback: serve index.html (200) for unknown paths so deep links
+    // like /:roomId work. Replaces the old public/_redirects.
+    "not_found_handling": "single-page-application"
+  }
+}

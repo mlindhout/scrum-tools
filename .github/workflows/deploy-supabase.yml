@@ -1,0 +1,32 @@
+name: Deploy Supabase migrations
+
+# The frontend deploys itself: Cloudflare Pages' native Git integration builds
+# and publishes `dist/` on every push (see docs/adr/0006-deploy-pipeline.md).
+# This workflow only owns the database: it pushes new migrations to the single
+# prod Supabase project, and only when a migration actually changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch: {}
+
+jobs:
+  db-push:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_ID }}"
+
+      - name: Push migrations
+        run: supabase db push

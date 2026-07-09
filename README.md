@@ -41,8 +41,26 @@ local `supabase start`); otherwise it is skipped.
 - `src/features/room/` — Room data access, Presence, and UI (JoinGate, shell).
 - `src/pages/` — landing and Room routes.
 
-## Deploy (Cloudflare Pages)
+## Deploy
 
-Build command `npm run build`, output directory `dist`. `public/_redirects`
-provides the SPA fallback so deep links like `/:roomId` serve `index.html`. Set
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as build environment variables.
+Two independent halves (see `docs/adr/0006-deploy-pipeline.md`):
+
+**Frontend — Cloudflare Workers (static assets, via Workers Builds).** Connect the
+repo in the CF dashboard; it builds and deploys on every push (previews per PR).
+Configure there: build command `npm run build`, deploy command `npx wrangler deploy`
+(the default), and env vars `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
+`wrangler.jsonc` points the deploy at `dist/` and sets the SPA fallback
+(`not_found_handling: "single-page-application"`) so deep links like `/:roomId`
+serve `index.html`.
+
+**Database — GitHub Action.** `.github/workflows/deploy-supabase.yml` runs
+`supabase db push` to the prod project on pushes to `main` that touch
+`supabase/migrations/**` (also runnable via `workflow_dispatch`). Migrations are
+forward-only and additive so the parallel frontend/DB deploy stays safe. Set these
+repository secrets:
+
+| Secret                  | What                                                  |
+| ----------------------- | ----------------------------------------------------- |
+| `SUPABASE_ACCESS_TOKEN` | Personal access token (Supabase dashboard → Account)  |
+| `SUPABASE_PROJECT_ID`   | Project ref of the prod project                       |
+| `SUPABASE_DB_PASSWORD`  | Database password of the prod project                 |

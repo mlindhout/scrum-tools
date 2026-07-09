@@ -1,0 +1,8 @@
+# Minimal Supabase CLI config. Lets both CI (`supabase link` in the deploy
+# workflow) and local devs resolve the same project. The project ref is passed
+# explicitly on `supabase link`, so `project_id` here is just a human label.
+project_id = "scrum-tools"
+
+[db]
+# Postgres major version of the hosted project; keep in sync with prod.
+major_version = 15
