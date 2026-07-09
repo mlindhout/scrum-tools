@@ -3,7 +3,7 @@
 Accountless planning poker & retrospectives. Create a Room, share the link,
 join with a name — no login. Vite + React + Tailwind 4 SPA talking directly to
 Supabase under RLS (see `docs/adr/`). Deployable as a static site on Cloudflare
-Pages.
+Workers.
 
 **Live demo:** <https://scrum-tools.mlindhout.workers.dev/>
 
