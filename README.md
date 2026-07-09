@@ -5,6 +5,8 @@ join with a name — no login. Vite + React + Tailwind 4 SPA talking directly to
 Supabase under RLS (see `docs/adr/`). Deployable as a static site on Cloudflare
 Pages.
 
+**Live demo:** <https://scrum-tools.mlindhout.workers.dev/>
+
 ## Develop
 
 ```bash
